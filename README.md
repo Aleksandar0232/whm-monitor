@@ -245,6 +245,7 @@ WHM_URL=http://127.0.0.1:8087 WHM_API_TOKEN=dev EXIM_SPOOL_DIR=/tmp python -m wh
 
 | Symptom | Cause and fix |
 |---|---|
+| `make up` says `failed to read .env: line N: unexpected character` | A line in `.env` is broken, usually a comment split in two by an accidental Enter. `make preflight` names the line and prints the command that removes it |
 | `make check` shows `FAIL ... HTTP 403` or `Permission denied` | The token lacks a privilege for that function. Add it, or drop the collector with `COLLECTORS=` |
 | `cphulk FAIL ... disabled` | cPHulk is off (common when CSF/LFD does brute-force protection). Remove `cphulk` from `COLLECTORS` |
 | `exim_queue FAIL ... EXIM_SPOOL_GID` | Run `make preflight` again, then `make up` |

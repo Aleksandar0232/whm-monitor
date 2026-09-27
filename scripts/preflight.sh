@@ -41,6 +41,16 @@ else
     else
         chmod 600 .env && ok ".env permissions fixed (were $perms)"
     fi
+    # Every line must be KEY=value, a comment or empty. A comment split in two by
+    # an accidental Enter makes `docker compose` refuse the whole file. Only line
+    # numbers are printed, in case a broken line holds a secret.
+    bad_lines=$(grep -nvE '^[A-Za-z_][A-Za-z0-9_]*=|^[[:space:]]*#|^[[:space:]]*$' .env | cut -d: -f1 | paste -sd, -)
+    if [[ -n $bad_lines ]]; then
+        fail ".env line(s) $bad_lines are not KEY=value or a comment; see them with: sed -n '${bad_lines%%,*}p' .env"
+        info "remove them with: sed -i -E '/^([A-Za-z_][A-Za-z0-9_]*=|[[:space:]]*#|[[:space:]]*\$)/!d' .env"
+    else
+        ok ".env syntax is valid"
+    fi
     for var in SERVER_NAME WHM_API_TOKEN GRAFANA_ADMIN_PASSWORD; do
         if [[ -n "$(getenv "$var")" ]]; then ok "$var is set"; else fail "$var is empty"; fi
     done
@@ -48,6 +58,14 @@ else
         ok "Telegram is configured"
     else
         warn "Telegram is not configured: alerts will only show in the Alertmanager UI"
+    fi
+    # The final word: does Compose itself accept compose.yaml together with .env?
+    if [[ -z $bad_lines ]] && docker compose version >/dev/null 2>&1; then
+        if compose_err=$(docker compose config --quiet 2>&1); then
+            ok "docker compose accepts compose.yaml and .env"
+        else
+            fail "docker compose rejects the configuration: $compose_err"
+        fi
     fi
 fi
 
