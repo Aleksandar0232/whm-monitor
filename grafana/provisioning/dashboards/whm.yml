@@ -1,0 +1,13 @@
+apiVersion: 1
+
+providers:
+  - name: whm-monitor
+    folder: WHM
+    type: file
+    disableDeletion: true
+    # Edits made in the UI are kept until the next restart; export the JSON
+    # into grafana/dashboards/ to make them permanent.
+    allowUiUpdates: true
+    updateIntervalSeconds: 60
+    options:
+      path: /etc/grafana/dashboards

@@ -1,0 +1,151 @@
+# Alerts for cPanel/WHM. Thresholds are starting points; tune them to your
+# server and run `make test-rules` after every change.
+
+groups:
+  - name: whm-exporter
+    rules:
+      - alert: WHMExporterDown
+        expr: up{job="whm"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "whm-exporter is not responding"
+          description: "Prometheus cannot scrape whm-exporter. Check: docker compose logs whm-exporter"
+
+      - alert: WHMCollectorFailing
+        expr: whm_collector_up == 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Collector {{ $labels.collector }} is failing"
+          description: >-
+            The {{ $labels.collector }} collector has failed for 15 minutes, so its
+            metrics are missing or stale. Run: docker compose run --rm whm-exporter --check
+
+  - name: whm-services
+    rules:
+      - alert: WHMServiceDown
+        # "running" only exists for services chkservd monitors.
+        expr: whm_service_running == 0 and on (instance, service) whm_service_enabled == 1
+        for: 3m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Service {{ $labels.service }} is down"
+          description: >-
+            {{ $labels.service }} is enabled in WHM but not running, and chkservd has
+            not brought it back for 3 minutes. Check: /scripts/restartsrv_{{ $labels.service }} --status
+
+  - name: whm-ssl
+    rules:
+      - alert: WHMSSLCertExpiringSoon
+        # Only certificates that are still valid: expired ones on abandoned
+        # domains would alert forever. They are listed on the dashboard instead.
+        expr: >-
+          (whm_ssl_cert_not_after_timestamp_seconds - time()) / 86400 < 7
+          and (whm_ssl_cert_not_after_timestamp_seconds - time()) > 0
+          and on (instance, servername) whm_ssl_cert_self_signed == 0
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "SSL for {{ $labels.servername }} expires in {{ $value | humanize }} days"
+          description: >-
+            AutoSSL should have renewed this certificate already (account {{ $labels.user }}).
+            Check the AutoSSL log in WHM > SSL/TLS > Manage AutoSSL, usually a DCV failure.
+
+  - name: whm-accounts
+    rules:
+      - alert: WHMAccountDiskQuotaNearlyFull
+        expr: whm_account_disk_used_bytes / whm_account_disk_limit_bytes > 0.9
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Account {{ $labels.user }} uses {{ $value | humanizePercentage }} of its disk quota"
+          description: "A full quota breaks mail delivery and uploads for this account."
+
+      - alert: WHMAccountInodesNearlyFull
+        expr: whm_account_inodes_used / whm_account_inodes_limit > 0.9
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Account {{ $labels.user }} uses {{ $value | humanizePercentage }} of its inode quota"
+
+  - name: whm-mail
+    rules:
+      - alert: WHMEximQueueLarge
+        expr: whm_exim_queue_messages > 500
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Exim queue has {{ $value }} messages"
+          description: >-
+            Look at whm_exim_queue_messages_by_local_user / _by_auth_domain on the
+            dashboard to find the sender. A compromised mailbox is the usual cause.
+
+      - alert: WHMEximQueueCritical
+        expr: whm_exim_queue_messages > 2000
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Exim queue has {{ $value }} messages"
+          description: "The server's IP is at risk of being blacklisted. Find and stop the sender."
+
+      - alert: WHMEximFrozenMessages
+        expr: whm_exim_queue_frozen_messages > 100
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $value }} frozen messages in the Exim queue"
+          description: "Usually undeliverable bounces. Review, then: exiqgrep -z -i | xargs exim -Mrm"
+
+      - alert: WHMPossibleSpamSender
+        # whm_email_messages covers EMAIL_STATS_WINDOW (1 hour by default).
+        expr: whm_email_messages{result="sent"} > 500
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.user }} sent {{ $value }} messages in the last hour"
+          description: "Check WHM > Email > Track Delivery for {{ $labels.domain }}."
+
+      - alert: WHMHighEmailFailureRate
+        expr: >-
+          (
+            whm_email_messages{result="failed"}
+            + ignoring (result) whm_email_messages{result="deferred"}
+          )
+          / ignoring (result) whm_email_messages{result="sent"} > 0.5
+          and ignoring (result) whm_email_messages{result="sent"} > 50
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.user }}: {{ $value | humanizePercentage }} of outgoing mail fails or defers"
+          description: "Typical for spam runs or mailing to a purchased list. Check Track Delivery."
+
+      - alert: WHMEmailHourlyLimitReached
+        expr: whm_email_reached_max_per_hour == 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.user }} hit the 'Max hourly emails per domain' limit"
+
+  - name: whm-security
+    rules:
+      - alert: WHMBruteForceWave
+        expr: whm_cphulk_blocked_ips{list="brute"} > 50
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cPHulk is blocking {{ $value }} IP addresses"
+          description: "An ongoing brute force campaign. Review WHM > Security Center > cPHulk."

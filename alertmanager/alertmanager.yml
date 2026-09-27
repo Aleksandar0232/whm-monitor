@@ -1,0 +1,40 @@
+# Alertmanager with Telegram. The bot token and chat id are never written to
+# this file: entrypoint.sh puts them from .env into files under /tmp.
+
+templates:
+  - /etc/alertmanager/templates/*.tmpl
+
+route:
+  receiver: telegram
+  group_by: [alertname, server]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  routes:
+    - matchers: [severity="critical"]
+      receiver: telegram
+      repeat_interval: 1h
+
+inhibit_rules:
+  # Critical and warning versions of the same problem: only send the critical.
+  # (Keep these pairs explicit. A generic "critical mutes warning" rule would let
+  # a down service hide an unrelated spam alert from the same exporter.)
+  - source_matchers: [alertname="WHMEximQueueCritical"]
+    target_matchers: [alertname="WHMEximQueueLarge"]
+    equal: [server]
+  - source_matchers: [alertname="HostDiskCritical"]
+    target_matchers: [alertname="HostDiskAlmostFull"]
+    equal: [server, mountpoint]
+  # When the exporter is down, its collectors are down too; say it once.
+  - source_matchers: [alertname="WHMExporterDown"]
+    target_matchers: [alertname="WHMCollectorFailing"]
+    equal: [server]
+
+receivers:
+  - name: telegram
+    telegram_configs:
+      - bot_token_file: /tmp/telegram_bot_token
+        chat_id_file: /tmp/telegram_chat_id
+        parse_mode: HTML
+        send_resolved: true
+        message: '{{ template "telegram.whm.message" . }}'

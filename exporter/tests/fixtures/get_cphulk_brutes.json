@@ -1,0 +1,33 @@
+{
+  "metadata": {
+    "command": "get_cphulk_brutes",
+    "result": 1,
+    "reason": "OK",
+    "version": 1
+  },
+  "data": {
+    "brutes": [
+      {
+        "ip": "203.0.113.10",
+        "exptime": "2026-09-27T12:00:00Z",
+        "logintime": "2026-09-27T11:50:00Z",
+        "notes": "",
+        "timeleft": 9
+      },
+      {
+        "ip": "203.0.113.11",
+        "exptime": "2026-09-27T12:00:00Z",
+        "logintime": "2026-09-27T11:51:00Z",
+        "notes": "",
+        "timeleft": 10
+      },
+      {
+        "ip": "203.0.113.11",
+        "exptime": "2026-09-27T12:00:00Z",
+        "logintime": "2026-09-27T11:52:00Z",
+        "notes": "",
+        "timeleft": 10
+      }
+    ]
+  }
+}

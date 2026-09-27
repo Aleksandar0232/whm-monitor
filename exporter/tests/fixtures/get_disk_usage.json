@@ -1,0 +1,33 @@
+{
+  "metadata": {
+    "command": "get_disk_usage",
+    "result": 1,
+    "reason": "OK",
+    "version": 1
+  },
+  "data": {
+    "accounts": [
+      {
+        "user": "alpha",
+        "blocks_used": 1048576,
+        "blocks_limit": 2097152,
+        "inodes_used": 12000,
+        "inodes_limit": null
+      },
+      {
+        "user": "beta",
+        "blocks_used": "512",
+        "blocks_limit": null,
+        "inodes_used": "40",
+        "inodes_limit": 250000
+      },
+      {
+        "user": "gamma",
+        "blocks_used": 1900000,
+        "blocks_limit": 2000000,
+        "inodes_used": 90000,
+        "inodes_limit": 100000
+      }
+    ]
+  }
+}

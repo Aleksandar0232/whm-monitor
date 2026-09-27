@@ -1,0 +1,123 @@
+# whm-monitor: Prometheus + Alertmanager + Grafana + exporters for one cPanel/WHM server.
+#
+# Every container uses the host network and listens on 127.0.0.1 only:
+#   - the exporter reaches WHM at https://127.0.0.1:2087 without opening anything,
+#   - Docker creates no NAT/iptables rules for these services, so CSF cannot break them,
+#   - nothing is reachable from the internet (use an SSH tunnel, see README).
+
+name: whm-monitor
+
+x-defaults: &defaults
+  restart: unless-stopped
+  network_mode: host
+  security_opt:
+    - no-new-privileges:true
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+
+services:
+  whm-exporter:
+    <<: *defaults
+    build:
+      context: ./exporter
+      # Build over the host network too, so pip works even if CSF has flushed
+      # Docker's NAT rules for the default bridge.
+      network: host
+    image: whm-exporter:local
+    user: "10001:10001"
+    # Supplementary group that can read the Exim spool (mail on cPanel, gid 12).
+    # scripts/preflight.sh detects the right value and writes it to .env.
+    group_add:
+      - "${EXIM_SPOOL_GID:-12}"
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop: [ALL]
+    environment:
+      WHM_URL: ${WHM_URL:-https://127.0.0.1:2087}
+      WHM_USER: ${WHM_USER:-root}
+      WHM_API_TOKEN: ${WHM_API_TOKEN:?set WHM_API_TOKEN in .env}
+      WHM_VERIFY_TLS: ${WHM_VERIFY_TLS:-false}
+      COLLECTORS: ${COLLECTORS:-all}
+      EMAIL_STATS_WINDOW: ${EMAIL_STATS_WINDOW:-3600}
+      EXIM_SPOOL_DIR: /var/spool/exim/input
+      EXPORTER_LISTEN_ADDR: 127.0.0.1
+      EXPORTER_PORT: "9877"
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    volumes:
+      - /var/spool/exim/input:/var/spool/exim/input:ro
+
+  node-exporter:
+    <<: *defaults
+    image: prom/node-exporter:v1.12.1
+    pid: host
+    read_only: true
+    cap_drop: [ALL]
+    command:
+      - --path.rootfs=/host
+      - --web.listen-address=127.0.0.1:9100
+      # cPanel jailshell (virtfs) and CloudLinux CageFS create many bind mounts
+      # that would show up as duplicate filesystems.
+      - --collector.filesystem.mount-points-exclude=^/(dev|proc|sys|run/credentials/.+|var/lib/docker/.+|var/lib/containers/storage/.+|home[0-9]*/virtfs/.+|usr/share/cagefs-skeleton(/.+)?)($$|/)
+    volumes:
+      - /:/host:ro,rslave
+
+  prometheus:
+    <<: *defaults
+    image: prom/prometheus:v3.15.0
+    depends_on: [whm-exporter, node-exporter, alertmanager]
+    environment:
+      # Used in prometheus.yml external_labels; shows up in every alert.
+      SERVER_NAME: ${SERVER_NAME:-whm-server}
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=${PROM_RETENTION_TIME:-30d}
+      - --storage.tsdb.retention.size=${PROM_RETENTION_SIZE:-5GB}
+      - --web.listen-address=127.0.0.1:9090
+    volumes:
+      - ./prometheus:/etc/prometheus:ro
+      - prometheus-data:/prometheus
+
+  alertmanager:
+    <<: *defaults
+    image: prom/alertmanager:v0.34.1
+    read_only: true
+    tmpfs:
+      - /tmp
+    entrypoint: ["/bin/sh", "/etc/alertmanager/entrypoint.sh"]
+    environment:
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+    volumes:
+      - ./alertmanager:/etc/alertmanager:ro
+      - alertmanager-data:/alertmanager
+
+  grafana:
+    <<: *defaults
+    image: grafana/grafana:13.2.2
+    depends_on: [prometheus]
+    environment:
+      GF_SERVER_HTTP_ADDR: 127.0.0.1
+      GF_SERVER_HTTP_PORT: "3000"
+      GF_SERVER_ROOT_URL: ${GRAFANA_ROOT_URL:-http://localhost:3000/}
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?set GRAFANA_ADMIN_PASSWORD in .env}
+      GF_SECURITY_DISABLE_GRAVATAR: "true"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /etc/grafana/dashboards/whm-overview.json
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/etc/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+
+volumes:
+  prometheus-data:
+  alertmanager-data:
+  grafana-data:

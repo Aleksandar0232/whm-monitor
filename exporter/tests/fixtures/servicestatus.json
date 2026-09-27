@@ -1,0 +1,59 @@
+{
+  "metadata": {
+    "command": "servicestatus",
+    "result": 1,
+    "reason": "OK",
+    "version": 1
+  },
+  "data": {
+    "service": [
+      {
+        "name": "httpd",
+        "display_name": "Apache Web Server",
+        "enabled": 1,
+        "installed": 1,
+        "monitored": 1,
+        "running": 1
+      },
+      {
+        "name": "exim",
+        "display_name": "Exim Mail Server",
+        "enabled": 1,
+        "installed": 1,
+        "monitored": 1,
+        "running": 1
+      },
+      {
+        "name": "mysql",
+        "display_name": "MySQL Server",
+        "enabled": 1,
+        "installed": 1,
+        "monitored": 1,
+        "running": 0
+      },
+      {
+        "name": "dovecot",
+        "display_name": "Dovecot IMAP/POP3",
+        "enabled": 1,
+        "installed": 1,
+        "monitored": 1,
+        "running": 1
+      },
+      {
+        "name": "named",
+        "display_name": "DNS Server",
+        "enabled": 0,
+        "installed": 1,
+        "monitored": 0
+      },
+      {
+        "name": "cpanel_php_fpm",
+        "display_name": "cPanel PHP-FPM",
+        "enabled": 1,
+        "installed": 1,
+        "monitored": 1,
+        "running": 1
+      }
+    ]
+  }
+}

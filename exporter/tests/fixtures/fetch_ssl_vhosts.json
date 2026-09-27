@@ -1,0 +1,71 @@
+{
+  "metadata": {
+    "command": "fetch_ssl_vhosts",
+    "result": 1,
+    "reason": "OK",
+    "version": 1
+  },
+  "data": {
+    "vhosts": [
+      {
+        "servername": "alpha.example",
+        "user": "alpha",
+        "type": "main",
+        "crt": {
+          "not_after": 1795184000,
+          "is_self_signed": 0,
+          "validation_type": "dv",
+          "issuer": {
+            "organizationName": "Let's Encrypt",
+            "commonName": "R11"
+          }
+        }
+      },
+      {
+        "servername": "beta.example",
+        "user": "beta",
+        "type": "main",
+        "crt": {
+          "not_after": 1790259200,
+          "is_self_signed": 0,
+          "validation_type": "dv",
+          "issuer": {
+            "organizationName": "Sectigo Limited"
+          }
+        }
+      },
+      {
+        "servername": "old.gamma.example",
+        "user": "gamma",
+        "type": "sub",
+        "crt": {
+          "not_after": 1789913600,
+          "is_self_signed": 1,
+          "validation_type": null,
+          "issuer": {
+            "commonName": "old.gamma.example"
+          }
+        }
+      },
+      {
+        "servername": "alpha.example",
+        "user": "alpha",
+        "type": "main",
+        "crt": {
+          "not_after": 1796912000,
+          "is_self_signed": 0,
+          "validation_type": "dv",
+          "issuer": {
+            "organizationName": "Let's Encrypt"
+          }
+        }
+      },
+      {
+        "servername": "nocert.example",
+        "user": "gamma",
+        "type": "addon",
+        "crt": {}
+      }
+    ]
+  }
+}

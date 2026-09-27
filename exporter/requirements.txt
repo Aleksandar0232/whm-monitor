@@ -1,0 +1,3 @@
+# Runtime dependencies, pinned for reproducible images.
+prometheus-client==0.26.0
+requests==2.34.2

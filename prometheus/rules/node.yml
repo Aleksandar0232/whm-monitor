@@ -1,0 +1,84 @@
+groups:
+  - name: host
+    rules:
+      - alert: HostExporterDown
+        expr: up{job="node"} == 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "node-exporter is not responding"
+
+      - alert: HostHighLoad
+        expr: >-
+          node_load5
+          / on (instance) count by (instance) (node_cpu_seconds_total{mode="idle"}) > 2
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Load is {{ $value | humanize }}x the number of CPU cores"
+          description: "Find the account behind it: WHM > Process Manager, or top -c"
+
+      - alert: HostMemoryLow
+        expr: node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes < 0.10
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Only {{ $value | humanizePercentage }} of memory is available"
+
+      - alert: HostDiskAlmostFull
+        expr: >-
+          node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs"}
+          / node_filesystem_size_bytes < 0.10
+          and node_filesystem_readonly == 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.mountpoint }} has {{ $value | humanizePercentage }} free"
+
+      - alert: HostDiskCritical
+        expr: >-
+          node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs"}
+          / node_filesystem_size_bytes < 0.05
+          and node_filesystem_readonly == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.mountpoint }} has only {{ $value | humanizePercentage }} free"
+          description: "MySQL and Exim stop working on a full disk."
+
+      - alert: HostDiskWillFillIn24h
+        expr: >-
+          predict_linear(node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs"}[6h], 24 * 3600) < 0
+          and node_filesystem_readonly == 0
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.mountpoint }} will be full within 24 hours at the current rate"
+
+      - alert: HostInodesAlmostFull
+        expr: >-
+          node_filesystem_files_free{fstype!~"tmpfs|overlay|squashfs"}
+          / node_filesystem_files < 0.10
+          and node_filesystem_readonly == 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.mountpoint }} has {{ $value | humanizePercentage }} inodes left"
+
+  - name: monitoring
+    rules:
+      - alert: AlertmanagerNotificationsFailing
+        expr: rate(alertmanager_notifications_failed_total[10m]) > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Alertmanager cannot deliver to {{ $labels.integration }}"
+          description: "Check TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID and: docker compose logs alertmanager"

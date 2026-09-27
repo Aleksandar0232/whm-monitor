@@ -1,0 +1,32 @@
+[project]
+name = "whm-exporter"
+version = "0.1.0"
+description = "Prometheus exporter for cPanel & WHM servers"
+readme = "../README.md"
+license = "MIT"
+requires-python = ">=3.11"
+dependencies = [
+    "prometheus-client>=0.26,<1",
+    "requests>=2.32,<3",
+]
+
+[project.scripts]
+whm-exporter = "whm_exporter.__main__:main"
+
+[tool.setuptools.packages.find]
+include = ["whm_exporter*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "BLE"]
+ignore = ["UP037"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["whm_exporter"]

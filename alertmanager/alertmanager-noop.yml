@@ -1,0 +1,8 @@
+# Used when TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID are not set: alerts are
+# visible in the Alertmanager UI (127.0.0.1:9093) but nothing is sent.
+route:
+  receiver: "null"
+  group_by: [alertname, server]
+
+receivers:
+  - name: "null"

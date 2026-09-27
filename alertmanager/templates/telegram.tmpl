@@ -1,0 +1,25 @@
+{{/* Telegram message (parse_mode HTML). Every value is passed through "html"
+     so a "<" in a label or annotation cannot break Telegram's parser. */}}
+
+{{ define "telegram.whm.alert" -}}
+<b>{{ .Labels.alertname | html }}</b>{{ if .Labels.severity }} · {{ .Labels.severity | html }}{{ end }}
+{{ .Annotations.summary | html }}
+{{- if and (eq .Status "firing") .Annotations.description }}
+<i>{{ .Annotations.description | html }}</i>
+{{- end }}
+{{- end }}
+
+{{ define "telegram.whm.message" -}}
+{{ if eq .Status "firing" }}🔥{{ else }}✅{{ end }} <b>{{ .CommonLabels.server | html }}</b> · {{ .Status | toUpper }}
+{{- range .Alerts.Firing }}
+
+{{ template "telegram.whm.alert" . }}
+{{- end }}
+{{- if .Alerts.Resolved }}
+
+<b>Resolved</b>
+{{- range .Alerts.Resolved }}
+✅ {{ .Annotations.summary | html }}
+{{- end }}
+{{- end }}
+{{- end }}

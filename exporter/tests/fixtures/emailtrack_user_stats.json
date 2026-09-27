@@ -1,0 +1,54 @@
+{
+  "metadata": {
+    "command": "emailtrack_user_stats",
+    "result": 1,
+    "reason": "OK",
+    "version": 1
+  },
+  "data": {
+    "records": [
+      {
+        "USER": "alpha",
+        "OWNER": "root",
+        "DOMAIN": "alpha.example",
+        "PRIMARY_DOMAIN": "alpha.example",
+        "SENDCOUNT": 14,
+        "SUCCESSCOUNT": 13,
+        "FAILCOUNT": 1,
+        "DEFERCOUNT": 0,
+        "DEFERFAILCOUNT": 1,
+        "TOTALSIZE": 27444,
+        "REACHED_MAXEMAILS": 0,
+        "REACHED_MAXDEFERFAIL": 0
+      },
+      {
+        "USER": "beta",
+        "OWNER": "reseller1",
+        "DOMAIN": "beta.example",
+        "PRIMARY_DOMAIN": "beta.example",
+        "SENDCOUNT": "900",
+        "SUCCESSCOUNT": "300",
+        "FAILCOUNT": "450",
+        "DEFERCOUNT": "150",
+        "DEFERFAILCOUNT": "600",
+        "TOTALSIZE": "1000000",
+        "REACHED_MAXEMAILS": "1",
+        "REACHED_MAXDEFERFAIL": 0
+      },
+      {
+        "USER": "beta",
+        "OWNER": "reseller1",
+        "DOMAIN": "shop.beta.example",
+        "PRIMARY_DOMAIN": "beta.example",
+        "SENDCOUNT": 100,
+        "SUCCESSCOUNT": 100,
+        "FAILCOUNT": 0,
+        "DEFERCOUNT": 0,
+        "DEFERFAILCOUNT": 0,
+        "TOTALSIZE": 5000,
+        "REACHED_MAXEMAILS": 0,
+        "REACHED_MAXDEFERFAIL": 1
+      }
+    ]
+  }
+}

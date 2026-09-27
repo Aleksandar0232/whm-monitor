@@ -1,0 +1,19 @@
+{
+  "metadata": {
+    "command": "get_cphulk_excessive_brutes",
+    "result": 1,
+    "reason": "OK",
+    "version": 1
+  },
+  "data": {
+    "excessive_brutes": [
+      {
+        "ip": "198.51.100.7",
+        "exptime": "2026-09-28T11:00:00Z",
+        "logintime": "2026-09-27T11:00:00Z",
+        "notes": "",
+        "timeleft": 1380
+      }
+    ]
+  }
+}

@@ -1,0 +1,143 @@
+# Unit tests for the alert rules: make test-rules
+# (promtool test rules prometheus/tests/rules_test.yml)
+# In promtool tests time() starts at 0, so timestamps below are small numbers.
+
+rule_files:
+  - ../rules/whm.yml
+  - ../rules/node.yml
+
+evaluation_interval: 1m
+
+tests:
+  - name: service down only fires for enabled services
+    interval: 1m
+    input_series:
+      - series: 'whm_service_running{instance="w", job="whm", service="mysql"}'
+        values: "0x10"
+      - series: 'whm_service_enabled{instance="w", job="whm", service="mysql"}'
+        values: "1x10"
+      - series: 'whm_service_running{instance="w", job="whm", service="named"}'
+        values: "0x10"
+      - series: 'whm_service_enabled{instance="w", job="whm", service="named"}'
+        values: "0x10"
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: WHMServiceDown
+        exp_alerts: []
+      - eval_time: 5m
+        alertname: WHMServiceDown
+        exp_alerts:
+          - exp_labels: {severity: critical, instance: w, job: whm, service: mysql}
+            exp_annotations:
+              summary: "Service mysql is down"
+              description: >-
+                mysql is enabled in WHM but not running, and chkservd has
+                not brought it back for 3 minutes. Check: /scripts/restartsrv_mysql --status
+
+  - name: ssl expiring soon, ignoring expired and self-signed
+    interval: 1m
+    input_series:
+      # expires at t=3 days -> about 3 days left
+      - series: 'whm_ssl_cert_not_after_timestamp_seconds{instance="w", job="whm", servername="soon.example", user="a"}'
+        values: "259200x120"
+      - series: 'whm_ssl_cert_self_signed{instance="w", job="whm", servername="soon.example", user="a"}'
+        values: "0x120"
+      # plenty of time left
+      - series: 'whm_ssl_cert_not_after_timestamp_seconds{instance="w", job="whm", servername="fine.example", user="a"}'
+        values: "8640000x120"
+      - series: 'whm_ssl_cert_self_signed{instance="w", job="whm", servername="fine.example", user="a"}'
+        values: "0x120"
+      # self-signed and expiring: no alert
+      - series: 'whm_ssl_cert_not_after_timestamp_seconds{instance="w", job="whm", servername="self.example", user="a"}'
+        values: "259200x120"
+      - series: 'whm_ssl_cert_self_signed{instance="w", job="whm", servername="self.example", user="a"}'
+        values: "1x120"
+      # already expired (t=0): no alert
+      - series: 'whm_ssl_cert_not_after_timestamp_seconds{instance="w", job="whm", servername="dead.example", user="a"}'
+        values: "0x120"
+      - series: 'whm_ssl_cert_self_signed{instance="w", job="whm", servername="dead.example", user="a"}'
+        values: "0x120"
+    alert_rule_test:
+      - eval_time: 90m
+        alertname: WHMSSLCertExpiringSoon
+        exp_alerts:
+          - exp_labels: {severity: warning, instance: w, job: whm, servername: soon.example, user: a}
+            exp_annotations:
+              summary: "SSL for soon.example expires in 2.938 days"
+              description: >-
+                AutoSSL should have renewed this certificate already (account a).
+                Check the AutoSSL log in WHM > SSL/TLS > Manage AutoSSL, usually a DCV failure.
+
+  - name: spam sender and failure rate
+    interval: 1m
+    input_series:
+      - series: 'whm_email_messages{instance="w", job="whm", user="beta", domain="beta.example", result="sent"}'
+        values: "1000x15"
+      - series: 'whm_email_messages{instance="w", job="whm", user="beta", domain="beta.example", result="failed"}'
+        values: "450x15"
+      - series: 'whm_email_messages{instance="w", job="whm", user="beta", domain="beta.example", result="deferred"}'
+        values: "150x15"
+      # few messages, all failing: below the volume floor, no alert
+      - series: 'whm_email_messages{instance="w", job="whm", user="alpha", domain="alpha.example", result="sent"}'
+        values: "10x15"
+      - series: 'whm_email_messages{instance="w", job="whm", user="alpha", domain="alpha.example", result="failed"}'
+        values: "10x15"
+      - series: 'whm_email_messages{instance="w", job="whm", user="alpha", domain="alpha.example", result="deferred"}'
+        values: "0x15"
+    alert_rule_test:
+      - eval_time: 12m
+        alertname: WHMPossibleSpamSender
+        exp_alerts:
+          - exp_labels: {severity: warning, instance: w, job: whm, user: beta, domain: beta.example, result: sent}
+            exp_annotations:
+              summary: "beta sent 1000 messages in the last hour"
+              description: "Check WHM > Email > Track Delivery for beta.example."
+      - eval_time: 12m
+        alertname: WHMHighEmailFailureRate
+        exp_alerts:
+          - exp_labels: {severity: warning, instance: w, job: whm, user: beta, domain: beta.example}
+            exp_annotations:
+              summary: "beta: 60% of outgoing mail fails or defers"
+              description: "Typical for spam runs or mailing to a purchased list. Check Track Delivery."
+
+  - name: disk quota
+    interval: 1m
+    input_series:
+      - series: 'whm_account_disk_used_bytes{instance="w", job="whm", user="gamma"}'
+        values: "95x40"
+      - series: 'whm_account_disk_limit_bytes{instance="w", job="whm", user="gamma"}'
+        values: "100x40"
+      - series: 'whm_account_disk_used_bytes{instance="w", job="whm", user="alpha"}'
+        values: "50x40"
+      - series: 'whm_account_disk_limit_bytes{instance="w", job="whm", user="alpha"}'
+        values: "100x40"
+      # unlimited account: no limit series, no alert
+      - series: 'whm_account_disk_used_bytes{instance="w", job="whm", user="beta"}'
+        values: "999999x40"
+    alert_rule_test:
+      - eval_time: 35m
+        alertname: WHMAccountDiskQuotaNearlyFull
+        exp_alerts:
+          - exp_labels: {severity: warning, instance: w, job: whm, user: gamma}
+            exp_annotations:
+              summary: "Account gamma uses 95% of its disk quota"
+              description: "A full quota breaks mail delivery and uploads for this account."
+
+  - name: stale collector
+    interval: 1m
+    input_series:
+      - series: 'whm_collector_up{instance="w", job="whm", collector="cphulk"}'
+        values: "1 1 0x20"
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: WHMCollectorFailing
+        exp_alerts: []
+      - eval_time: 20m
+        alertname: WHMCollectorFailing
+        exp_alerts:
+          - exp_labels: {severity: warning, instance: w, job: whm, collector: cphulk}
+            exp_annotations:
+              summary: "Collector cphulk is failing"
+              description: >-
+                The cphulk collector has failed for 15 minutes, so its
+                metrics are missing or stale. Run: docker compose run --rm whm-exporter --check

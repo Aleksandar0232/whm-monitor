@@ -1,0 +1,33 @@
+{
+  "metadata": {
+    "command": "listaccts",
+    "result": 1,
+    "reason": "OK",
+    "version": 1
+  },
+  "data": {
+    "acct": [
+      {
+        "user": "alpha",
+        "domain": "alpha.example",
+        "suspended": 0,
+        "plan": "Basic",
+        "owner": "root"
+      },
+      {
+        "user": "beta",
+        "domain": "beta.example",
+        "suspended": 1,
+        "plan": "Basic",
+        "owner": "reseller1"
+      },
+      {
+        "user": "gamma",
+        "domain": "gamma.example",
+        "suspended": "0",
+        "plan": "",
+        "owner": "root"
+      }
+    ]
+  }
+}

@@ -1,0 +1,81 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  PROMETHEUS_IMAGE: prom/prometheus:v3.15.0
+  ALERTMANAGER_IMAGE: prom/alertmanager:v0.34.1
+
+jobs:
+  exporter:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: exporter
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: exporter/requirements-dev.txt
+      - run: pip install -r requirements-dev.txt
+      - run: ruff check .
+      - run: ruff format --check .
+      - run: python -m pytest
+      - name: Lint exposed metrics with promtool
+        run: |
+          python tests/fake_whm.py --port 8087 --token ci &
+          sleep 1
+          mkdir -p /tmp/spool
+          WHM_URL=http://127.0.0.1:8087 WHM_API_TOKEN=ci EXIM_SPOOL_DIR=/tmp/spool \
+            python -m whm_exporter --once > /tmp/metrics.txt
+          docker run --rm -i --entrypoint promtool "$PROMETHEUS_IMAGE" check metrics < /tmp/metrics.txt
+
+  monitoring-config:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: promtool check config
+        run: >
+          docker run --rm -v "$PWD/prometheus:/etc/prometheus:ro" --entrypoint promtool
+          "$PROMETHEUS_IMAGE" check config /etc/prometheus/prometheus.yml
+      - name: promtool test rules
+        run: >
+          docker run --rm -v "$PWD/prometheus:/etc/prometheus:ro" -w /etc/prometheus/tests
+          --entrypoint promtool "$PROMETHEUS_IMAGE" test rules rules_test.yml
+      - name: amtool check-config
+        run: >
+          docker run --rm -v "$PWD/alertmanager:/etc/alertmanager:ro" --entrypoint amtool
+          "$ALERTMANAGER_IMAGE" check-config
+          /etc/alertmanager/alertmanager.yml /etc/alertmanager/alertmanager-noop.yml
+      - name: Grafana dashboard is valid JSON
+        run: python3 -m json.tool grafana/dashboards/whm-overview.json > /dev/null
+      - name: docker compose config
+        run: |
+          WHM_API_TOKEN=ci GRAFANA_ADMIN_PASSWORD=ci docker compose config --quiet
+
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/build-push-action@v7
+        with:
+          context: exporter
+          load: true
+          tags: whm-exporter:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Smoke test
+        run: |
+          docker run --rm whm-exporter:ci --version
+          # No token: must fail fast with exit code 2
+          set +e; docker run --rm whm-exporter:ci --check; code=$?; set -e
+          test "$code" -eq 2
